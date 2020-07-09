@@ -12,6 +12,8 @@ import time
 import math
 import sys
 import random
+import os
+import csv
 
 # global param
 ua = [
@@ -79,7 +81,8 @@ def debug_printline(*params):
 # debug exit with error code/msg
 def debug_exit(msg):
     if DEBUG_MODE:
-        sys.exit(msg)
+        # sys.exit(msg)
+        pass
     else:
         pass
     return
@@ -138,7 +141,7 @@ def browser_close():
 # save product details to file
 # 保存产品信息
 
-def save_product_to_file(p_url, p_id, description, price_dollars, price_cents, img):
+def save_product_to_file(p_id, p_description, p_price, p_url, p_img_url):
     '''
     根据 url 创建文件夹和文件名
     ie. /our-range
@@ -155,7 +158,20 @@ def save_product_to_file(p_url, p_id, description, price_dollars, price_cents, i
     :param img:
     :return:
     '''
-    pass
+
+    csv_dir = 'products/'
+    csv_file_name = csv_dir + p_id + '.csv'
+
+    if not os.path.exists(csv_dir):
+        os.makedirs(csv_dir,)
+    if not os.path.exists(csv_file_name):
+        with open(csv_file_name, 'w') as csv_file:
+            csv_file.writelines(p_id + '\n')
+            csv_file.writelines(p_description + '\n')
+            csv_file.writelines(p_price + '\n')
+            csv_file.writelines(p_url + '\n')
+            csv_file.writelines(p_img_url + '\n')
+    return
 
 
 # parse our-range
@@ -498,6 +514,8 @@ def parse_product_list(url):
                                         debug_print(" | ", product_description)
                                         debug_print(" | $", product_price)
                                         debug_print(" | ", product_url)
+
+                                        save_product_to_file(product_id, product_description, str(product_price), product_url, 'img_url/')
 
                                         # 分析产品页面
                                         # parse_items(product_url)
