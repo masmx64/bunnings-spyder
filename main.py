@@ -119,6 +119,8 @@ def browser_load_remote_url(url):
     global SeleniumDriver
     # firefox = FirefoxBinary("/usr/bin/firefox")
     SeleniumDriver = webdriver.Firefox()
+    # 设置隐性等待时间，最长等待 30 秒
+    SeleniumDriver.implicitly_wait(30)
     SeleniumDriver.get(url)
     soup = BeautifulSoup(SeleniumDriver.page_source, 'lxml')
     return soup
@@ -131,6 +133,29 @@ def browser_close():
     global SeleniumDriver
     SeleniumDriver.close()
     return
+
+
+# save product details to file
+# 保存产品信息
+
+def save_product_to_file(p_url, p_id, description, price_dollars, price_cents, img):
+    '''
+    根据 url 创建文件夹和文件名
+    ie. /our-range
+        ../tools
+          ../power-tools
+            ../drills
+              ../cordless-power-drills
+                ../Makita LXT 18V Brushless Cordless Impact Driver - Skin Only.csv
+    :param p_url:
+    :param p_id:
+    :param description:
+    :param price_dollars:
+    :param price_cents:
+    :param img:
+    :return:
+    '''
+    pass
 
 
 # parse our-range
@@ -375,9 +400,10 @@ def parse_product_list(url):
                 page_count = math.ceil(productlist_count/ItemsPerPage)
                 debug_printline("**** total pages:", page_count)
 
-                for page_num in range(1, page_count):
+                for page_num in range(0, page_count):
                     # 分别爬取每个列表页面
                     # 页面 url = url?page=1 ...
+                    page_num += 1
                     page_link = url + '?page=' + str(page_num)
                     debug_printline("page# ", page_num)
                     debug_printline(page_link)
@@ -385,6 +411,8 @@ def parse_product_list(url):
                     # load dynamic url using selenium
                     # 产品列表是动态生成，所以使用 selenium 加载完成之后再爬取
                     soup = browser_load_remote_url(page_link)
+
+                    current_product_index_on_this_page = 0
 
                     tag_div_container = soup.find('div', class_='product-list-group paged-items')
                     # tag_div_total = tag_div_container.find('div', 'content-layout_inside-anchor')
@@ -401,43 +429,81 @@ def parse_product_list(url):
                                     '''
                                     这里需要等待 selenium 重新加载页面数据
                                     否则会返回错误
+                                    已经设置隐性等待时间 30 秒 
                                     '''
+                                    # 再设置一次等待时间
+                                    time.sleep(5)
+
+                                    debug_print("**** new item **** { ")
+                                    current_product_index_on_this_page += 1
+                                    debug_print(current_product_index_on_this_page)
+                                    debug_print(" } ")
+
                                     # 产品唯一 7 位数编码
-                                    product_id = tag_article.get('data-product-id')
+                                    product_id = tag_article.get('data-product-id').strip()
+                                    if not product_id:
+                                        product_id = "0000000"
+
                                     tag_a = tag_article.find('a')
-                                    # 产品链接
-                                    product_url = tag_a.get('href')
-                                    tag_description = tag_a.find('div', 'codified-product-tile__row--title')
-                                    tag_desc_p = tag_description.find('p', 'fn')
-                                    tag_desc_p_span = tag_desc_p.find('span', attrs={'aria-hidden': True})
-                                    # 产品名称
-                                    product_description = tag_desc_p_span.get_text()
-                                    tag_price = tag_a.find('div', class_='codified-product-tile__row--price-button has-price-value')
-                                    tag_price_div = tag_price.find('div', 'codified-product-tile__price')
-                                    tag_price_div_div = tag_price_div.find('div', 'codified-product-tile__price--value price-value')
-                                    tag_price_div_div_span_dollars = tag_price_div_div.find('span', 'codified-product-tile__price--value--dollars')
-                                    tag_price_dollars_str = tag_price_div_div_span_dollars.get_text().strip()
-                                    if tag_price_dollars_str:
-                                        tag_price_dollars = int(tag_price_dollars_str)
-                                    else:
-                                        tag_price_dollars = 0
-                                    tag_price_div_div_span_cents = tag_price_div_div.find('span', 'codified-product-tile__price--value--decimal-cents')
-                                    tag_price_cents_str = tag_price_div_div_span_cents.get_text().strip()
-                                    if tag_price_cents_str:
-                                        tag_price_cents = int(tag_price_cents_str)/100
-                                    else:
-                                        tag_price_cents = 0
-                                    # 产品价格
-                                    product_price = tag_price_dollars + tag_price_cents
 
-                                    debug_printline("====> item details:")
-                                    debug_printline("====> ", product_id)
-                                    debug_printline("====> ", product_description)
-                                    debug_printline("====> $", product_price)
-                                    debug_printline("====> ", product_url)
+                                    if not tag_a:
+                                        # 不存在此产品链接
+                                        product_url = "/"
+                                    else:
+                                        # 产品链接
+                                        product_url = BASE_URL + tag_a.get('href')
 
-                                    # 分析产品页面
-                                    parse_items(product_url)
+                                        # 产品名称描述
+                                        tag_description = tag_a.find('div', 'codified-product-tile__row--title')
+                                        if tag_description:
+                                            tag_desc_p = tag_description.find('p', 'fn')
+                                            if tag_desc_p:
+                                                tag_desc_p_span = tag_desc_p.find('span', attrs={'style':'display: block; overflow: hidden; height: 0px; width: 100%;', 'aria-hidden': True})
+                                                if tag_desc_p_span:
+                                                    # 产品名称
+                                                    product_description = tag_desc_p_span.get_text()
+                                                else:
+                                                    product_description = tag_desc_p.get_text()
+                                                    if not product_description:
+                                                        product_description = "failed to load product information"
+
+                                        # 产品价格
+                                        tag_price = tag_a.find('div', class_='codified-product-tile__row--price-button has-price-value')
+                                        if not tag_price:
+                                            product_price = 0
+                                        else:
+                                            tag_price_div = tag_price.find('div', 'codified-product-tile__price')
+                                            if tag_price_div:
+                                                tag_price_div_div = tag_price_div.find('div', 'codified-product-tile__price--value price-value')
+                                                if tag_price_div_div:
+                                                    tag_price_div_div_span_dollars = tag_price_div_div.find('span', 'codified-product-tile__price--value--dollars')
+                                                    if tag_price_div_div_span_dollars:
+                                                        tag_price_dollars_str = tag_price_div_div_span_dollars.get_text().strip().replace(',', '')
+                                                        if tag_price_dollars_str:
+                                                            tag_price_dollars = int(tag_price_dollars_str)
+                                                        else:
+                                                            tag_price_dollars = 0
+                                                        tag_price_div_div_span_cents = tag_price_div_div.find('span', 'codified-product-tile__price--value--decimal-cents')
+                                                        tag_price_cents_str = tag_price_div_div_span_cents.get_text().strip()
+                                                        if tag_price_cents_str:
+                                                            tag_price_cents = float(tag_price_cents_str)
+                                                        else:
+                                                            tag_price_cents = 0
+                                                        # 产品价格
+                                                        product_price = tag_price_dollars + tag_price_cents
+
+                                        # 打印产品信息
+                                        # debug_print("====> item details:")
+                                        debug_print(product_id)
+                                        debug_print(" | ", product_description)
+                                        debug_print(" | $", product_price)
+                                        debug_print(" | ", product_url)
+
+                                        # 分析产品页面
+                                        # parse_items(product_url)
+
+                                    # 换行
+                                    debug_printline('')
 
                     # close selenium browser window
                     browser_close()
