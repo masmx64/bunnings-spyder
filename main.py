@@ -94,7 +94,7 @@ def debug_level(level):
                     "our-range/tools/power-tools/drills/cordless-drill-skins",      # 五级页面 - 产品列表
                     "items"                                                         # 六级页面 - 产品详细信息
                    ]
-    debug_printline("**** DEBUG LEVEL: ", breadcrumble[level])
+    # debug_printline("**** DEBUG LEVEL: ", breadcrumble[level])
     return
 
 
@@ -217,7 +217,7 @@ def parse_main_categories(url):
     soup = load_remote_url(url)
 
     categories = soup.find_all('div', class_='inside-layout', attrs={"datav3-module-name": "RangeCategories"})
-    if categories is not None:
+    if categories:
         for cat in categories:
             tag_div = cat.find('div', 'category-block-heading')
             tag_a = tag_div.find('a', 'category-block-heading__title')
@@ -258,18 +258,18 @@ def parse_sub_categories(url):
     soup = load_remote_url(url)
 
     tag_div_container = soup.find('div', class_='content-layout_inside', attrs={"id":"content-layout_inside-anchor"})
-    if tag_div_container is not None:
+    if tag_div_container:
         tags_div = tag_div_container.find_all('div', 'inside-layout')
-        if tags_div is not None:
+        if tags_div:
             for tag_div in tags_div:
                 tag_ul = tag_div.find('ul', 'not-list')
-                if tag_ul is not None:
+                if tag_ul:
                     tag_li = tag_ul.find('li', 'sidebar-dropdown-nav')
-                    if tag_li is not None:
+                    if tag_li:
                         tag_li_ul = tag_li.find('ul')
-                        if tag_li_ul is not None:
+                        if tag_li_ul:
                             tags_li_ul_li = tag_li_ul.find_all('li')
-                            if tags_li_ul_li is not None:
+                            if tags_li_ul_li:
                                 for tag_li_ul_li in tags_li_ul_li:
                                     tag_a = tag_li_ul_li.find('a')
                                     tag_a_name = tag_a.get_text()
@@ -323,18 +323,18 @@ def parse_sub1_categories(url):
     soup = load_remote_url(url)
 
     tag_div_container = soup.find('div', class_='content-layout_inside', attrs={"id":"content-layout_inside-anchor"})
-    if tag_div_container is not None:
+    if tag_div_container:
         tags_div = tag_div_container.find_all('div', 'inside-layout')
-        if tags_div is not None:
+        if tags_div:
             for tag_div in tags_div:
                 tag_ul = tag_div.find('ul', 'not-list')
-                if tag_ul is not None:
+                if tag_ul:
                     tag_li = tag_ul.find('li', 'sidebar-dropdown-nav')
-                    if tag_li is not None:
+                    if tag_li:
                         tag_li_ul = tag_li.find('ul')
-                        if tag_li_ul is not None:
+                        if tag_li_ul:
                             tags_li_ul_li = tag_li_ul.find_all('li')
-                            if tags_li_ul_li is not None:
+                            if tags_li_ul_li:
                                 for tag_li_ul_li in tags_li_ul_li:
                                     tag_a = tag_li_ul_li.find('a')
                                     tag_a_name = tag_a.get_text()
@@ -386,16 +386,16 @@ def parse_product_list(url):
 
     tag_div_container = soup.find('div', class_='product-list-group paged-items')
 
-    if tag_div_container is not None:
+    if tag_div_container:
         # this is the product list page
         # find products total counts first, default count/page is 48
-        tag_label = soup.find('label', class_="left-sidebar_checkbox_btn", attrs={"for": "fulfillment-order_online"})
-        if tag_label is not None:
-            tag_label_span = tag_label.find('span', 'left-sidebar_checkbox_count')
-            if tag_label_span is not None:
-                tag_label_span_str = tag_label_span.get_text()
+        tag_div = soup.find('div', 'search-result__sub-heading-refresh')
+        if tag_div:
+            tag_div_h2 = tag_div.find('h2', 'search-result__sub-heading')
+            if tag_div_h2:
+                tag_div_h2_str = tag_div_h2.get_text()
 
-                productlist_count = int(tag_label_span_str[1:-1])
+                productlist_count = int(tag_div_h2_str.split()[0])
                 debug_printline("**** total products: ", productlist_count)
                 page_count = math.ceil(productlist_count/ItemsPerPage)
                 debug_printline("**** total pages:", page_count)
@@ -419,12 +419,12 @@ def parse_product_list(url):
                     tags_div = tag_div_container.find_all('div', 'js-product-tile-container')
                     for tag_div in tags_div:
                         tag_section = tag_div.find('section', 'product-list')
-                        if tag_section is not None:
+                        if tag_section:
                             '''
                             每个产品使用 <article></article> 包含
                             '''
                             tags_article = tag_section.find_all('article', class_='codified-product-tile', attrs={"data-product-id"})
-                            if tags_article is not None:
+                            if tags_article:
                                 for tag_article in tags_article:
                                     '''
                                     这里需要等待 selenium 重新加载页面数据
