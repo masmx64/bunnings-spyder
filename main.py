@@ -88,8 +88,8 @@ URL_LOG_FILE = 'url.log'
 
 def log2file(log_file, url, msg):
     with open(log_file, 'a') as log:
-        log.writelines(url)
-        log.writelines(msg)
+        log.writelines(url + '\n')
+        log.writelines(msg + '\n')
     return
 
 
@@ -179,7 +179,7 @@ def save_product_to_file(p_category, p_id, p_description, p_price, p_url, p_img_
     # :param p_img_url:
     # :return:
 
-    csv_dir = "./products"          # BASE_DIR + p_category
+    csv_dir = "./products/"          # BASE_DIR + p_category
     csv_file_name = csv_dir + p_id + '.csv'
 
     if not os.path.exists(csv_dir):
@@ -298,7 +298,7 @@ def parse_sub_categories(url):
     debug_level(2)
 
     soup = load_remote_url(url)
-
+    '''
     tag_div_container = soup.find('div', class_='content-layout_inside', attrs={"id": "content-layout_inside-anchor"})
     if not tag_div_container:
         debug_printline("WARNING: parse_sub_categories | tag_div_container is None")
@@ -322,40 +322,48 @@ def parse_sub_categories(url):
             tag_ul = tag_nav.find('ul', 'not-list')
             """
             tag_ul = tag_div.find('ul', 'not-list')
-            if not tag_ul:
-                debug_printline("WARNING: parse_sub_categories | tag_ul is None")
-                debug_exit(url, "WARNING: parse_sub_categories | tag_ul is None")
+    '''
+    tag_ul = soup.find('ul', 'not-list')
+    if not tag_ul:
+        debug_printline("WARNING: parse_sub_categories | tag_ul is None")
+        debug_exit(url, "WARNING: parse_sub_categories | tag_ul is None")
+    else:
+        tag_li = tag_ul.find('li', 'current')
+        if not tag_li:
+            debug_printline("WARNING: parse_sub_categories | tags_li is None")
+            debug_exit(url, "WARNING: parse_sub_categories | tags_li is None")
+        else:
+            tag_li_ul = tag_li.find('ul')
+            if not tag_li_ul:
+                debug_printline("WARNING: parse_sub_categories | tag_li_ul is None")
+                debug_exit(url, "WARNING: parse_sub_categories | tag_li_ul is None")
             else:
-                tag_li = tag_ul.find('li', 'current')
-                if not tag_li:
-                    debug_printline("WARNING: parse_sub_categories | tags_li is None")
-                    debug_exit(url, "WARNING: parse_sub_categories | tags_li is None")
+                tags_li_ul_li = tag_li_ul.find_all('li')
+                if not tags_li_ul_li:
+                    debug_printline("WARNING: parse_sub_categories | tags_li_ul_li is None")
+                    debug_exit(url, "WARNING: parse_sub_categories | tags_li_ul_li is None")
                 else:
-                    tag_li_ul = tag_li.find('ul')
-                    if not tag_li_ul:
-                        debug_printline("WARNING: parse_sub_categories | tag_li_ul is None")
-                        debug_exit(url, "WARNING: parse_sub_categories | tag_li_ul is None")
-                    else:
-                        tags_li_ul_li = tag_li_ul.find_all('li')
-                        if not tags_li_ul_li:
-                            debug_printline("WARNING: parse_sub_categories | tags_li_ul_li is None")
-                            debug_exit(url, "WARNING: parse_sub_categories | tags_li_ul_li is None")
+                    for tag_li_ul_li in tags_li_ul_li:
+                        tag_a = tag_li_ul_li.find('a')
+                        tag_a_name = tag_a.get_text().strip()
+                        tag_a_url = tag_a.get('href')
+                        # debug print
+                        debug_printline(tag_a_url + " | " + tag_a_name)
+
+                        # save to log file
+                        debug_log(tag_a_url, tag_a_name)
+
+                        # 这里需要判断本页面是子分类页面还是产品列表页面
+                        # 判断依据是
+                        tag_div = soup.find('div', 'search-result__sub-heading-refresh')
+                        if not tag_div:
+                            # parse sub categories
+                            # 爬取子分类
+                            # 页面结构和算法和本方法相同
+                            # 考虑转成递归函数
+                            parse_sub1_categories(BASE_URL + tag_a_url)
                         else:
-                            for tag_li_ul_li in tags_li_ul_li:
-                                tag_a = tag_li_ul_li.find('a')
-                                tag_a_name = tag_a.get_text().strip()
-                                tag_a_url = tag_a.get('href')
-                                # debug print
-                                debug_printline(tag_a_url + " | " + tag_a_name)
-
-                                # save to log file
-                                debug_log(tag_a_url, tag_a_name)
-
-                                # parse sub categories
-                                # 爬取子分类
-                                # 页面结构和算法和本方法相同
-                                # 考虑转成递归函数
-                                parse_sub1_categories(BASE_URL + tag_a_url)
+                            parse_product_list(BASE_URL + tag_a_url)
     return
 
 
@@ -377,11 +385,11 @@ def parse_sub1_categories(url):
     debug_level(3)
 
     soup = load_remote_url(url)
-
+    '''
     tag_div_container = soup.find('div', class_='content-layout_inside', attrs={"id": "content-layout_inside-anchor"})
     if not tag_div_container:
-        debug_printline("WARNING: parse_sub_categories | tag_div_container is None")
-        debug_exit(url, "WARNING: parse_sub_categories | tag_div_container is None")
+        debug_printline("WARNING: parse_sub1_categories | tag_div_container is None")
+        debug_exit(url, "WARNING: parse_sub1_categories | tag_div_container is None")
     else:
         tag_div = tag_div_container.find('div', 'inside-layout')
         if not tag_div:
@@ -402,38 +410,41 @@ def parse_sub1_categories(url):
             tag_ul = tag_nav.find('ul', 'not-list')
             """
             tag_ul = tag_div.find('ul', 'not-list')
-            if not tag_ul:
-                debug_printline("WARNING: parse_sub1_categories | tag_ul is None")
-                debug_exit(url, "WARNING: parse_sub1_categories | tag_ul is None")
+    '''
+    tag_ul = soup.find('ul', 'not-list')
+    if not tag_ul:
+        debug_printline("WARNING: parse_sub1_categories | tag_ul is None")
+        debug_exit(url, "WARNING: parse_sub1_categories | tag_ul is None")
+    else:
+        tag_li = tag_ul.find('li', 'current')
+        if not tag_li:
+            debug_printline("WARNING: parse_sub1_categories | tags_li is None")
+            debug_exit(url, "WARNING: parse_sub1_categories | tags_li is None")
+        else:
+            tag_li_ul = tag_li.find('ul')
+            if not tag_li_ul:
+                debug_printline("WARNING: parse_sub1_categories | tag_li_ul is None")
+                debug_exit(url, "WARNING: parse_sub1_categories | tag_li_ul is None")
             else:
-                tag_li = tag_ul.find('li', 'current')
-                if not tag_li:
-                    debug_printline("WARNING: parse_sub1_categories | tags_li is None")
-                    debug_exit(url, "WARNING: parse_sub1_categories | tags_li is None")
+                # 这里需要判断本页面是子分类页面还是产品列表页面 #
+                tags_li_ul_li = tag_li_ul.find_all('li')
+                if not tags_li_ul_li:
+                    debug_printline("WARNING: parse_sub1_categories | tags_li_ul_li is None")
+                    debug_exit(url, "WARNING: parse_sub1_categories | tags_li_ul_li is None")
                 else:
-                    tag_li_ul = tag_li.find('ul')
-                    if not tag_li_ul:
-                        debug_printline("WARNING: parse_sub1_categories | tag_li_ul is None")
-                        debug_exit(url, "WARNING: parse_sub1_categories | tag_li_ul is None")
-                    else:
-                        tags_li_ul_li = tag_li_ul.find_all('li')
-                        if not tags_li_ul_li:
-                            debug_printline("WARNING: parse_sub1_categories | tags_li_ul_li is None")
-                            debug_exit(url, "WARNING: parse_sub1_categories | tags_li_ul_li is None")
-                        else:
-                            for tag_li_ul_li in tags_li_ul_li:
-                                tag_a = tag_li_ul_li.find('a')
-                                tag_a_name = tag_a.get_text()
-                                tag_a_url = tag_a.get('href')
-                                # debug print
-                                debug_printline(tag_a_name)
-                                debug_printline(tag_a_url)
+                    for tag_li_ul_li in tags_li_ul_li:
+                        tag_a = tag_li_ul_li.find('a')
+                        tag_a_name = tag_a.get_text()
+                        tag_a_url = tag_a.get('href')
+                        # debug print
+                        debug_printline(tag_a_name)
+                        debug_printline(tag_a_url)
 
-                                # save to log file
-                                debug_log(tag_a_url, tag_a_name)
+                        # save to log file
+                        debug_log(tag_a_url, tag_a_name)
 
-                                # parse sub categories
-                                parse_product_list(BASE_URL + tag_a_url)
+                        # parse sub categories
+                        parse_product_list(BASE_URL + tag_a_url)
     return
 
 
@@ -455,16 +466,25 @@ def parse_product_list(url):
 
     soup = load_remote_url(url)
 
-    tag_div_container = soup.find('div', class_='product-list-group paged-items')
+    tag_div_container = soup.find('div', attrs={"class": "product-list-group", "class": "paged-items"})
 
-    if tag_div_container:
+    if not tag_div_container:
+        debug_printline("WARNING: parse_product_list | tag_div_container is None")
+        debug_exit(url, "WARNING: parse_product_list | tag_div_container is None")
+    else:
         # this is the product list page
         # find products total counts first, default count/page is 48
         tag_div = soup.find('div', 'search-result__sub-heading-refresh')
-        if tag_div:
+        if not tag_div:
+            debug_printline("WARNING: parse_product_list | tag_legend is None")
+            debug_exit(url, "WARNING: parse_product_list | tag_legend is None")
+        else:
             tag_div_h2 = tag_div.find('h2', 'search-result__sub-heading')
-            if tag_div_h2:
-                tag_div_h2_str = tag_div_h2.get_text()
+            if not tag_div_h2:
+                debug_printline("WARNING: parse_product_list | tag_label_span is None")
+                debug_exit(url, "WARNING: parse_product_list | tag_label_span is None")
+            else:
+                tag_div_h2_str = tag_div_h2.get_text().strip()
 
                 productlist_count = int(tag_div_h2_str.split()[0])
                 debug_printline("**** total products: ", productlist_count)
@@ -485,7 +505,7 @@ def parse_product_list(url):
 
                     current_product_index_on_this_page = 0
 
-                    tag_div_container = soup.find('div', class_='product-list-group paged-items')
+                    tag_div_container = soup.find('div', attrs={"class": "product-list-group", "class": "paged-items"})
                     # tag_div_total = tag_div_container.find('div', 'content-layout_inside-anchor')
                     tags_div = tag_div_container.find_all('div', 'js-product-tile-container')
                     for tag_div in tags_div:
@@ -537,6 +557,7 @@ def parse_product_list(url):
                                                     product_description = tag_desc_p.get_text()
                                                     if not product_description:
                                                         product_description = "failed to load product information"
+                                                        debug_printline(product_description)
 
                                         # 产品价格
                                         tag_price = tag_a.find('div', class_='codified-product-tile__row--price-button has-price-value')
@@ -586,15 +607,6 @@ def parse_product_list(url):
 
                     # close selenium browser window
                     browser_close()
-            else:
-                debug_printline("WARNING: parse_product_list | tag_label_span is None")
-                debug_exit(url, "WARNING: parse_product_list | tag_label_span is None")
-        else:
-            debug_printline("WARNING: parse_product_list | tag_legend is None")
-            debug_exit(url, "WARNING: parse_product_list | tag_legend is None")
-    else:
-        debug_printline("WARNING: parse_product_list | tag_div_container is None")
-        debug_exit(url, "WARNING: parse_product_list | tag_div_container is None")
     return
 
 
