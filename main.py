@@ -14,6 +14,10 @@ import sys
 import random
 import os
 import csv
+import rich
+from rich import print
+from rich.console import Console
+
 
 # global param
 ua = [
@@ -53,6 +57,9 @@ DEBUG_MODE = True
 
 global SeleniumDriver
 global ItemsPerPage
+global console
+
+console = Console()
 
 # 产品列表页面每页显示的产品数
 # 默认是 48
@@ -63,7 +70,7 @@ ItemsPerPage = 48
 def debug_print(*params):
     if DEBUG_MODE :
         for s in params:
-            print(s, end='')
+            console.print(s, end='')
     else:
         pass
     return
@@ -73,8 +80,8 @@ def debug_print(*params):
 def debug_printline(*params):
     if DEBUG_MODE:
         for s in params:
-            print(s, end='')
-        print('')
+            console.print("[bold magenta]" + s + "[/bold magenta]", end='')
+        console.print('')
     else:
         pass
     return
@@ -194,6 +201,7 @@ def save_product_to_file(p_category, p_id, p_description, p_price, p_url, p_img_
     return
 
 
+# ======== ======== ======== ======== ======== ======== ======== ========
 # parse our-range
 # 爬取总体分类页面
 
@@ -205,7 +213,7 @@ def parse_our_range(url):
     #                          ../...
 
     # debug print
-    debug_printline("**** parse_our_range ****")
+    debug_printline("==== ==== <our-range> ==== ====")
     debug_printline(url)
     debug_level(0)
 
@@ -218,7 +226,7 @@ def parse_our_range(url):
         tag_a_name = tag_a.get_text().strip()
         tag_a_url = BASE_URL + tag_a.get('href')
         # debug print
-        debug_printline(tag_a_name + " | " + tag_a_url)
+        debug_printline(tag_a_name, " | ", tag_a_url)
 
         # save to log file
         debug_log(tag_a_url, tag_a_name)
@@ -229,14 +237,14 @@ def parse_our_range(url):
             tag_li_a = tag_li.find('a')
             tag_li_a_name = tag_li_a.get_text().strip()
             tag_li_a_url = tag_li_a.get('href')
-            debug_printline(tag_a_name + " | " + tag_li_a_url + " | " + tag_li_a_name)
+            debug_printline(tag_a_name, " | ", tag_li_a_url, " | ", tag_li_a_name)
 
             # parse_sub_categories(BASE_URL + tag_li_a_url)
         # parse main categories
         parse_main_categories(tag_a_url)
 
     # debug print
-    debug_exit(url, "**** finished! ****")
+    debug_exit(url, "==== ==== </our-range> ==== ====")
     return
 
 
@@ -251,7 +259,7 @@ def parse_main_categories(url):
     #                                ../...
 
     # debug print
-    debug_printline("**** parse_main_categories ****")
+    debug_printline("==== ==== <main_categories> ==== ====")
     debug_printline(url)
     debug_level(1)
 
@@ -264,17 +272,17 @@ def parse_main_categories(url):
             tag_a = tag_div.find('a', 'category-block-heading__title')
             # category title
             cat_name = tag_a.find('h2', 'category-block-heading__text').get_text().strip()
-            cat_url = BASE_URL + tag_a.get('href')
+            cat_url = tag_a.get('href')
             # categories count
             cat_count = int(tag_a.find('span', 'category-block-heading__count').get_text().strip())
             # debug print
-            debug_printline(cat_name, " | ", cat_url, " | ", cat_count)
+            debug_printline(cat_name, " | ", cat_url, " | ", str(cat_count))
 
             # save to log file
             debug_log(cat_url, cat_name + ' = ' + str(cat_count))
 
             # parse sub categories
-            parse_sub_categories(cat_url)
+            parse_sub_categories(BASE_URL + cat_url)
     else:
         debug_printline(url)
         debug_exit(url, "WARNING: parse_main_categories | categories is None")
@@ -293,7 +301,7 @@ def parse_sub_categories(url):
     #                                            ../...
 
     # debug print
-    debug_printline('**** parse_sub_categories ****')
+    debug_printline("==== ==== <sub-categories> ==== ====")
     debug_printline(url)
     debug_level(2)
 
@@ -351,7 +359,7 @@ def parse_sub_categories(url):
                         debug_printline(tag_a_url + " | " + tag_a_name)
 
                         # save to log file
-                        debug_log(tag_a_url, tag_a_name)
+                        debug_log(tag_a_url, " | " + tag_a_name)
 
                         # 这里需要判断本页面是子分类页面还是产品列表页面
                         # 判断依据是
@@ -360,8 +368,7 @@ def parse_sub_categories(url):
                             # parse sub categories
                             # 爬取子分类
                             # 页面结构和算法和本方法相同
-                            # 考虑转成递归函数
-                            parse_sub1_categories(BASE_URL + tag_a_url)
+                            parse_sub_categories(BASE_URL + tag_a_url)
                         else:
                             parse_product_list(BASE_URL + tag_a_url)
     return
@@ -380,7 +387,7 @@ def parse_sub1_categories(url):
     #                                                   ../...
 
     # debug print
-    debug_printline('**** parse_sub_sub_categories ****')
+    debug_printline("==== ==== <sub-sub-categories> ==== ====")
     debug_printline(url)
     debug_level(3)
 
@@ -460,7 +467,7 @@ def parse_product_list(url):
     #                                ../...
 
     # debug print
-    debug_printline('**** parse_product_list ****')
+    debug_printline("==== ==== <product-list> ==== ====")
     debug_printline(url)
     debug_level(4)
 
@@ -486,17 +493,19 @@ def parse_product_list(url):
             else:
                 tag_div_h2_str = tag_div_h2.get_text().strip()
 
-                productlist_count = int(tag_div_h2_str.split()[0])
-                debug_printline("**** total products: ", productlist_count)
+                productlist_count_str = tag_div_h2_str.split()[0]
+                productlist_count = int(productlist_count_str)
+                debug_printline(">> total products: ", productlist_count_str)
                 page_count = math.ceil(productlist_count/ItemsPerPage)
-                debug_printline("**** total pages:", page_count)
+                debug_printline(">>    total pages: ", str(page_count))
 
                 for page_num in range(0, page_count):
                     # 分别爬取每个列表页面
                     # 页面 url = url?page=1 ...
                     page_num += 1
-                    page_link = url + '?page=' + str(page_num)
-                    debug_printline("page# ", page_num)
+                    page_num_str = str(page_num)
+                    page_link = url + '?page=' + page_num_str
+                    debug_printline("page# ", page_num_str)
                     debug_printline(page_link)
 
                     # load dynamic url using selenium
@@ -622,7 +631,7 @@ def parse_items(url):
 
     # 详细信息已经可以从产品列表提取出来了，暂时不用分析此页面
     # debug print
-    debug_printline("**** parse_items ****")
+    debug_printline("==== ==== <item-page> ==== ====")
     debug_printline(url)
     debug_level(5)
 
