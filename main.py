@@ -359,7 +359,7 @@ def parse_sub_categories(url):
                         debug_printline(tag_a_url + " | " + tag_a_name)
 
                         # save to log file
-                        debug_log(tag_a_url, " | " + tag_a_name)
+                        debug_log(tag_a_url, tag_a_name)
 
                         # 这里需要判断本页面是子分类页面还是产品列表页面
                         # 判断依据是
