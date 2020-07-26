@@ -65,6 +65,7 @@ console = Console()
 # 默认是 48
 ItemsPerPage = 48
 
+
 # debug print
 # print line without CRLF
 def debug_print(*params):
@@ -80,7 +81,7 @@ def debug_print(*params):
 def debug_printline(*params):
     if DEBUG_MODE:
         for s in params:
-            console.print("[bold magenta]" + s + "[/bold magenta]", end='')
+            console.print(s, end='')
         console.print('')
     else:
         pass
