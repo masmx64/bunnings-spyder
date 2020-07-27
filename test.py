@@ -67,6 +67,24 @@ console = Console()
 ItemsPerPage = 48
 
 
+# 测试页面类别
+
+def test_url_level(soup):
+    if soup.find('div', "chalkboard-module-dropdown"):
+        return 1
+    elif soup.find('div', attrs={"class": "inside-layout", "datav3-module-name": "RangeCategories"}):
+        return 2
+    elif soup.find('ul', attrs={"class": "not-list"}):
+        return 3
+    elif soup.find('div', attrs={"class": "search-result__sub-heading-refresh"}):
+        return 4
+    elif soup.find('div', attrs={"class": "product-detail__container"}):
+        return 5
+    else:
+        return 0
+    return
+
+
 # debug print
 # print line without CRLF
 def debug_print(*params):
@@ -601,10 +619,41 @@ else:
 
 start_time = time.asctime(time.localtime(time.time()))
 debug_printline(start_time)
-debug_log(url, start_time)
 
-DEBUG_LEVEL = 0
-parse_our_range(url)
+args_num = len(sys.argv)
+if args_num > 1:
+    for i in range(1, args_num):
+        start_time = time.asctime(time.localtime(time.time()))
+        debug_log(url, start_time)
+
+        url = sys.argv[i]
+        soup = load_remote_url(url)
+        url_level = test_url_level(soup)
+
+        if url_level == 1:
+            debug_printline(">> [ our range ]")
+            parse_our_range(url)
+        elif url_level == 2:
+            debug_printline(">> [ main category ]")
+            parse_main_categories(url)
+        elif url_level == 3:
+            debug_printline(">> [ sub category ]")
+            parse_main_categories(url)
+        elif url_level == 4:
+            debug_printline(">> [ product list ]")
+            parse_sub_categories(url)
+        elif url_level == 5:
+            debug_printline(">> [ item details ]")
+            parse_items(url)
+        else:
+            debug_printline("argv[", str(i), "] ", "is not valid url")
+
+        finish_time = time.asctime(time.localtime(time.time()))
+        debug_log(url, finish_time)
+
+else:
+    DEBUG_LEVEL = 0
+    parse_our_range(url)
 
 finish_time = time.asctime(time.localtime(time.time()))
 debug_printline(finish_time)
