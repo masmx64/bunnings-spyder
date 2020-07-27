@@ -105,7 +105,7 @@ def debug_exit(url, msg):
     # debug exit with error code/msg
     if DEBUG_MODE:
         log2file(WARNING_LOG_FILE, url, msg)
-        sys.exit(msg)
+        # sys.exit(msg)
     else:
         pass
     return
@@ -199,6 +199,31 @@ def save_product_to_file(p_category, p_id, p_description, p_price, p_url, p_img_
             csv_file.writelines(p_price + '\n')
             csv_file.writelines(p_url + '\n')
             csv_file.writelines(p_img_url + '\n')
+    return
+
+
+# save url details to file
+# 保存 URL 信息
+
+def save_url_to_file(p_name, p_url):
+    # 根据 url 创建文件
+    # :param p_name:
+    # :param p_url:
+    # :return:
+
+    des_dir = "./url/"
+    des_file_name = des_dir + p_name + '.url'
+
+    if not os.path.exists(des_dir):
+        os.makedirs(des_dir,)
+    if os.path.exists(des_file_name):
+        # file already exists, return false
+        return False
+    else:
+        # file not exists, create file
+        with open(des_file_name, 'w') as des_file:
+            des_file.writelines(p_url + '\n')
+        return True
     return
 
 
@@ -356,103 +381,29 @@ def parse_sub_categories(url):
                         tag_a = tag_li_ul_li.find('a')
                         tag_a_name = tag_a.get_text().strip()
                         tag_a_url = tag_a.get('href')
-                        # debug print
-                        debug_printline(tag_a_url + " | " + tag_a_name)
 
-                        # save to log file
-                        debug_log(tag_a_url, tag_a_name)
+                        # 这里需要检测该页面是否已经爬取过
+                        # 如果已经爬过，则跳过
 
-                        # 这里需要判断本页面是子分类页面还是产品列表页面
-                        # 判断依据是
-                        tag_div = soup.find('div', 'search-result__sub-heading-refresh')
-                        if not tag_div:
-                            # parse sub categories
-                            # 爬取子分类
-                            # 页面结构和算法和本方法相同
-                            parse_sub_categories(BASE_URL + tag_a_url)
-                        else:
-                            parse_product_list(BASE_URL + tag_a_url)
-    return
+                        # save_url_list()
+                        # if not existing_url(tag_a_url):
+                        if save_url_to_file(tag_a_name, tag_a_url):
+                            # debug print
+                            debug_printline(tag_a_url + " | " + tag_a_name)
 
+                            # save to log file
+                            debug_log(tag_a_url, tag_a_name)
 
-# parse sub categories
-# 爬取子分类
-# 和上一级页面结构和算法相同
-
-def parse_sub1_categories(url):
-    # INPUT:
-    # URL = BASE_URL + /our-range/tools/power-tools/drills
-    #                                            ../...
-    # OUTPUT:
-    # URL = BASE_URL + /our-range/tools/power-tools/drills/cordless-drill-skins
-    #                                                   ../...
-
-    # debug print
-    debug_printline("==== ==== <sub-sub-categories> ==== ====")
-    debug_printline(url)
-    debug_level(3)
-
-    soup = load_remote_url(url)
-    '''
-    tag_div_container = soup.find('div', class_='content-layout_inside', attrs={"id": "content-layout_inside-anchor"})
-    if not tag_div_container:
-        debug_printline("WARNING: parse_sub1_categories | tag_div_container is None")
-        debug_exit(url, "WARNING: parse_sub1_categories | tag_div_container is None")
-    else:
-        tag_div = tag_div_container.find('div', 'inside-layout')
-        if not tag_div:
-            debug_printline("WARNING: parse_sub1_categories | tags_div is None")
-            debug_exit(url, "WARNING: parse_sub1_categories | tags_div is None")
-        else:
-            """
-            tag_section = tag_div.find('section', 'layout_article_sidebar__left')
-            if not tag_section:
-                debug_printline(tag_div)
-                debug_exit(url, "sub1 - section")
-            tag_aside = tag_section.find('aside')
-            if not tag_aside:
-                debug_exit(url, "sub1 - aside")
-            tag_nav = tag_aside.find('nav', 'sidebar-dropdown-nav-wrapper')
-            if not tag_nav:
-                debug_exit(url, "sub1 - nav")
-            tag_ul = tag_nav.find('ul', 'not-list')
-            """
-            tag_ul = tag_div.find('ul', 'not-list')
-    '''
-    tag_ul = soup.find('ul', 'not-list')
-    if not tag_ul:
-        debug_printline("WARNING: parse_sub1_categories | tag_ul is None")
-        debug_exit(url, "WARNING: parse_sub1_categories | tag_ul is None")
-    else:
-        tag_li = tag_ul.find('li', 'current')
-        if not tag_li:
-            debug_printline("WARNING: parse_sub1_categories | tags_li is None")
-            debug_exit(url, "WARNING: parse_sub1_categories | tags_li is None")
-        else:
-            tag_li_ul = tag_li.find('ul')
-            if not tag_li_ul:
-                debug_printline("WARNING: parse_sub1_categories | tag_li_ul is None")
-                debug_exit(url, "WARNING: parse_sub1_categories | tag_li_ul is None")
-            else:
-                # 这里需要判断本页面是子分类页面还是产品列表页面 #
-                tags_li_ul_li = tag_li_ul.find_all('li')
-                if not tags_li_ul_li:
-                    debug_printline("WARNING: parse_sub1_categories | tags_li_ul_li is None")
-                    debug_exit(url, "WARNING: parse_sub1_categories | tags_li_ul_li is None")
-                else:
-                    for tag_li_ul_li in tags_li_ul_li:
-                        tag_a = tag_li_ul_li.find('a')
-                        tag_a_name = tag_a.get_text()
-                        tag_a_url = tag_a.get('href')
-                        # debug print
-                        debug_printline(tag_a_name)
-                        debug_printline(tag_a_url)
-
-                        # save to log file
-                        debug_log(tag_a_url, tag_a_name)
-
-                        # parse sub categories
-                        parse_product_list(BASE_URL + tag_a_url)
+                            # 这里需要判断本页面是子分类页面还是产品列表页面
+                            # 判断依据是
+                            tag_div = soup.find('div', 'search-result__sub-heading-refresh')
+                            if not tag_div:
+                                # parse sub categories
+                                # 爬取子分类
+                                # 页面结构和算法和本方法相同
+                                parse_sub_categories(BASE_URL + tag_a_url)
+                            else:
+                                parse_product_list(BASE_URL + tag_a_url)
     return
 
 
@@ -474,9 +425,10 @@ def parse_product_list(url):
 
     soup = load_remote_url(url)
 
-    tag_div_container = soup.find('div', attrs={"class": "product-list-group", "class": "paged-items"})
+    tag_div_container = soup.find('div', attrs={"class": ["product-list-group", "paged-items"]})
 
     if not tag_div_container:
+        debug_printline("WARNING: ", url)
         debug_printline("WARNING: parse_product_list | tag_div_container is None")
         debug_exit(url, "WARNING: parse_product_list | tag_div_container is None")
     else:
