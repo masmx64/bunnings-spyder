@@ -17,6 +17,7 @@ import csv
 import rich
 from rich import print
 from rich.console import Console
+from rich.table import Column, Table
 
 
 # global param
@@ -65,6 +66,24 @@ console = Console()
 # 产品列表页面每页显示的产品数
 # 默认是 48
 ItemsPerPage = 48
+
+
+# 测试页面类别
+
+def test_url_level(soup):
+    if soup.find('div', "chalkboard-module-dropdown"):
+        return 1
+    elif soup.find('div', attrs={"class": "inside-layout", "datav3-module-name": "RangeCategories"}):
+        return 2
+    elif soup.find('ul', attrs={"class": "not-list"}):
+        return 3
+    elif soup.find('div', attrs={"class": "search-result__sub-heading-refresh"}):
+        return 4
+    elif soup.find('div', attrs={"class": "product-detail__container"}):
+        return 5
+    else:
+        return 0
+    return
 
 
 # debug print
@@ -117,6 +136,30 @@ def debug_log(url, msg):
         log2file(URL_LOG_FILE, url, msg)
     else:
         pass
+    return
+
+
+# 输出产品列表到表格
+
+def debug_add_table_header(table):
+    if DEBUG_MODE:
+        table.add_column("ID", style="dim", width=12, justify="right")
+        table.add_column("S/N", justify="left")
+        table.add_column("ITEM", justify="left")
+        table.add_column("PRICE", justify="right")
+        table.add_column("URL", justify="left")
+    return
+
+
+def debug_add_item(table, id, sn, name, price, url):
+    if DEBUG_MODE:
+        table.add_row(id, sn, name, price, url)
+    return
+
+
+def debug_printtable(table):
+    if DEBUG_MODE:
+        console.print(table)
     return
 
 
@@ -211,6 +254,8 @@ def save_url_to_file(p_name, p_url):
     # :param p_name:
     # :param p_url:
     # :return:
+    #           True    if file not existing, create new file
+    #           False   if file already existed
 
     des_dir = "./url/"
     des_file_name = des_dir + p_name + '.url'
@@ -376,7 +421,7 @@ def parse_sub_categories(url):
                 else:
                     for tag_li_ul_li in tags_li_ul_li:
                         tag_a = tag_li_ul_li.find('a')
-                        tag_a_name = tag_a.get_text().strip()
+                        tag_a_name = tag_a.get_text().strip().replace('/', ' ')
                         tag_a_url = tag_a.get('href')
 
                         # 这里需要检测该页面是否已经爬取过
@@ -461,6 +506,10 @@ def parse_product_list(url):
                     # 产品列表是动态生成，所以使用 selenium 加载完成之后再爬取
                     soup = browser_load_remote_url(page_link)
 
+                    # 添加表格
+                    table = Table(show_header=True, header_style="bold magenta")
+                    debug_add_table_header(table)
+
                     current_product_index_on_this_page = 0
 
                     tag_div_container = soup.find('div', attrs={"class": "product-list-group", "class": "paged-items"})
@@ -474,6 +523,7 @@ def parse_product_list(url):
                             '''
                             tags_article = tag_section.find_all('article', class_='codified-product-tile', attrs={"data-product-id"})
                             if tags_article:
+
                                 for tag_article in tags_article:
                                     '''
                                     这里需要等待 selenium 重新加载页面数据
@@ -483,10 +533,12 @@ def parse_product_list(url):
                                     # 再设置一次等待时间
                                     # time.sleep(5)
 
-                                    debug_print("{ ")
+                                    # 更新产品索引
                                     current_product_index_on_this_page += 1
-                                    debug_print(current_product_index_on_this_page)
-                                    debug_print(" } ")
+
+                                    # debug_print("{ ")
+                                    # debug_print(current_product_index_on_this_page)
+                                    # debug_print(" } ")
 
                                     # 产品唯一 7 位数编码
                                     product_id = tag_article.get('data-product-id')
@@ -548,12 +600,15 @@ def parse_product_list(url):
                                             # 产品价格
                                             product_price = tag_price_dollars + tag_price_cents
 
+                                        # 产品图片链接
+
+
                                         # 打印产品信息
-                                        # debug_print("I/N:")
-                                        debug_print(product_id)
-                                        debug_print(" | ", product_description)
-                                        debug_print(" | $", product_price)
-                                        debug_print(" | ", product_url)
+                                        debug_add_item(table, str(current_product_index_on_this_page), product_id, product_description, "$" + str(product_price), product_url)
+                                        # debug_print(product_id)
+                                        # debug_print(" | ", product_description)
+                                        # debug_print(" | $", product_price)
+                                        # debug_print(" | ", product_url)
 
                                         save_product_to_file('', product_id, product_description, str(product_price), product_url, 'img_url/')
 
@@ -561,7 +616,10 @@ def parse_product_list(url):
                                         # parse_items(BASE_URL + product_url)
 
                                     # 换行
-                                    debug_printline('')
+                                    # debug_printline('')
+
+                    # 打印表格
+                    debug_printtable(table)
 
                     # close selenium browser window
                     browser_close()
@@ -601,10 +659,41 @@ else:
 
 start_time = time.asctime(time.localtime(time.time()))
 debug_printline(start_time)
-debug_log(url, start_time)
 
-DEBUG_LEVEL = 0
-parse_our_range(url)
+args_num = len(sys.argv)
+if args_num > 1:
+    for i in range(1, args_num):
+        start_time = time.asctime(time.localtime(time.time()))
+        debug_log(url, start_time)
+
+        url = sys.argv[i]
+        soup = load_remote_url(url)
+        url_level = test_url_level(soup)
+
+        if url_level == 1:
+            debug_printline(">> [ our range ]")
+            parse_our_range(url)
+        elif url_level == 2:
+            debug_printline(">> [ main category ]")
+            parse_main_categories(url)
+        elif url_level == 3:
+            debug_printline(">> [ sub category ]")
+            parse_main_categories(url)
+        elif url_level == 4:
+            debug_printline(">> [ product list ]")
+            parse_sub_categories(url)
+        elif url_level == 5:
+            debug_printline(">> [ item details ]")
+            parse_items(url)
+        else:
+            debug_printline("argv[", str(i), "] ", "is not valid url")
+
+        finish_time = time.asctime(time.localtime(time.time()))
+        debug_log(url, finish_time)
+
+else:
+    DEBUG_LEVEL = 0
+    parse_our_range(url)
 
 finish_time = time.asctime(time.localtime(time.time()))
 debug_printline(finish_time)
