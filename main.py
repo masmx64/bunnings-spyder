@@ -19,6 +19,7 @@ from rich import print
 from rich.console import Console
 from rich.table import Column, Table
 
+DEBUG_MODE = True
 
 # global param
 ua = [
@@ -48,15 +49,20 @@ ua = [
         "Mozilla/5.0 (Windows; U; Windows NT 5.1) Gecko/20070803 Firefox/1.5.0.12 "
     ]
 
-DEBUG_URL = "./tools.html"
 BASE_URL = "https://www.bunnings.com.au"
 START_URL = BASE_URL + "/our-range"
 
-BASE_DIR = "./bunnings-products/"
+DEBUG_URL = "./tools.html"
 
-DEBUG_MODE = True
+BASE_DIR = "./bunnings-warehouse/"
+CAT_FILE_EXT = ".cat"
 
-global SeleniumDriver
+global WARNING_LOG_FILE
+WARNING_LOG_FILE = 'warning.log'
+global URL_LOG_FILE
+URL_LOG_FILE = 'url.log'
+
+global fox_driver
 global ItemsPerPage
 global console
 global DEBUG_LEVEL
@@ -108,20 +114,15 @@ def debug_printline(*params):
     return
 
 
-global WARNING_LOG_FILE
-WARNING_LOG_FILE = 'warning.log'
-global URL_LOG_FILE
-URL_LOG_FILE = 'url.log'
-
-
 def log2file(log_file, url, msg):
     with open(log_file, 'a') as log:
         log.writelines(url + '\n')
-        log.writelines(msg + '\n')
+        if msg:
+            log.writelines(msg + '\n')
     return
 
 
-def debug_exit(url, msg):
+def debug_log_warning_msg(url, msg):
     # debug exit with error code/msg
     if DEBUG_MODE:
         log2file(WARNING_LOG_FILE, url, msg)
@@ -131,7 +132,7 @@ def debug_exit(url, msg):
     return
 
 
-def debug_log(url, msg):
+def debug_log_url(url, msg):
     if DEBUG_MODE:
         log2file(URL_LOG_FILE, url, msg)
     else:
@@ -143,11 +144,11 @@ def debug_log(url, msg):
 
 def debug_add_table_header(table):
     if DEBUG_MODE:
-        table.add_column("ID", style="dim", width=12, justify="right")
-        table.add_column("S/N", justify="left")
-        table.add_column("ITEM", justify="left")
-        table.add_column("PRICE", justify="right")
-        table.add_column("URL", justify="left")
+        table.add_column("ID", style="dim", width=4, justify="right")
+        table.add_column("S/N", width=9, justify="left")
+        table.add_column("ITEM", width=96, justify="left")
+        table.add_column("PRICE", width=12, justify="right")
+        table.add_column("URL", width=64, justify="left")
     return
 
 
@@ -182,7 +183,7 @@ breadcrumb = [
 
 def load_remote_url(url):
     # load remote file
-    time.sleep(1)
+    # time.sleep(3)
     with requests.request('GET', url, headers={'User-agent': random.choice(ua)}) as webpage:
         content = webpage.text
         soup = BeautifulSoup(content, 'lxml')
@@ -194,13 +195,15 @@ def load_remote_url(url):
 # 适用于五级页面
 
 def browser_load_remote_url(url):
-    global SeleniumDriver
-    # firefox = FirefoxBinary("/usr/bin/firefox")
-    SeleniumDriver = webdriver.Firefox()
+    global FOX_DRIVER
+    firefox = FirefoxBinary("/usr/bin/firefox")
+    options = webdriver.FirefoxOptions()
+    options.add_argument('--headless')
+    FOX_DRIVER = webdriver.Firefox(firefox_options=options)
     # 设置隐性等待时间，最长等待 30 秒
-    SeleniumDriver.implicitly_wait(30)
-    SeleniumDriver.get(url)
-    soup = BeautifulSoup(SeleniumDriver.page_source, 'lxml')
+    FOX_DRIVER.implicitly_wait(30)
+    FOX_DRIVER.get(url)
+    soup = BeautifulSoup(FOX_DRIVER.page_source, 'lxml')
     return soup
 
 
@@ -208,8 +211,8 @@ def browser_load_remote_url(url):
 # 关闭 selenium 打开的浏览器窗口
 
 def browser_close():
-    global SeleniumDriver
-    SeleniumDriver.close()
+    global FOX_DRIVER
+    FOX_DRIVER.close()
     return
 
 
@@ -231,11 +234,14 @@ def save_product_to_file(p_category, p_id, p_description, p_price, p_url, p_img_
     # :param p_img_url:
     # :return:
 
-    csv_dir = "./products/"          # BASE_DIR + p_category
-    csv_file_name = csv_dir + p_id + '.csv'
+    csv_dir = BASE_DIR + p_category
+    csv_file_name = csv_dir + '/' + p_id + '.csv'
 
     if not os.path.exists(csv_dir):
-        os.makedirs(csv_dir,)
+        # debug_log_warning_msg(p_category, "WARNING: " + p_category + " is not existing")
+        os.makedirs(csv_dir)
+        # debug_printline("WARNING: " + csv_dir + " is not existing")
+        # return
     if not os.path.exists(csv_file_name):
         with open(csv_file_name, 'w') as csv_file:
             csv_file.writelines(p_id + '\n')
@@ -243,34 +249,55 @@ def save_product_to_file(p_category, p_id, p_description, p_price, p_url, p_img_
             csv_file.writelines(p_price + '\n')
             csv_file.writelines(p_url + '\n')
             csv_file.writelines(p_img_url + '\n')
+    else:
+        # debug_printline("WARNING: " + csv_file_name + " is existing")
+        pass
     return
 
 
-# save url details to file
-# 保存 URL 信息
+# strip category from url
+# 从 url 中提取产品类别
+# url 是完整的 网页链接
 
-def save_url_to_file(p_name, p_url):
+def get_cat_from_url(url):
+    if url.startswith(BASE_URL):
+        return url[len(BASE_URL):]
+    else:
+        return url
+
+
+# save category url details to file
+# 保存商品分类的 URL 信息
+
+def save_cat_url(cat_url, cat_name):
+    dest_dir = BASE_DIR + cat_url + '/'
+    dest_file = dest_dir + cat_name + CAT_FILE_EXT
+
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
+    if not os.path.exists(dest_file):
+        with open(dest_file, 'w') as cat:
+            cat.writelines(cat_url + '\n')
+    return
+
+
+# 检查产品分类页面是否已经被爬取过
+
+def cat_is_existing(p_url, p_name):
     # 根据 url 创建文件
     # :param p_name:
     # :param p_url:
     # :return:
-    #           True    if file not existing, create new file
-    #           False   if file already existed
+    #           True    if existing
+    #           False   if not existing
 
-    des_dir = "./url/"
-    des_file_name = des_dir + p_name + '.url'
+    dest_dir = BASE_DIR + p_url + p_name + '/'
+    dest_file_name = dest_dir + p_name + CAT_FILE_EXT
 
-    if not os.path.exists(des_dir):
-        os.makedirs(des_dir,)
-    if os.path.exists(des_file_name):
-        # file already exists, return false
-        return False
-    else:
-        # file not exists, create file
-        with open(des_file_name, 'w') as des_file:
-            des_file.writelines(p_url + '\n')
-        return True
-    return
+    if os.path.exists(dest_dir):
+        if os.path.exists(dest_file_name):
+            return True
+    return False
 
 
 # ======== ======== ======== ======== ======== ======== ======== ========
@@ -300,7 +327,7 @@ def parse_our_range(url):
         debug_printline(tag_a_name, " | ", tag_a_url)
 
         # save to log file
-        debug_log(tag_a_url, tag_a_name)
+        debug_log_url(tag_a_url, '')
 
         # parse each category
         tags_li = tag_div.find('ul', 'chalkboard-menu').find_all('li')
@@ -315,7 +342,7 @@ def parse_our_range(url):
         parse_main_categories(tag_a_url)
 
     # debug print
-    debug_exit(url, "==== ==== </our-range> ==== ====")
+    debug_log_warning_msg(url, "==== ==== </our-range> ==== ====")
     return
 
 
@@ -349,13 +376,13 @@ def parse_main_categories(url):
             debug_printline(cat_name, " | ", cat_url, " | ", str(cat_count))
 
             # save to log file
-            debug_log(cat_url, cat_name + ' = ' + str(cat_count))
+            debug_log_url(cat_url, cat_name + ' = ' + str(cat_count))
 
             # parse sub categories
             parse_sub_categories(BASE_URL + cat_url)
     else:
         debug_printline(url)
-        debug_exit(url, "WARNING: parse_main_categories | categories is None")
+        debug_log_warning_msg(url, "WARNING: parse_main_categories | categories is None")
     return
 
 
@@ -378,23 +405,23 @@ def parse_sub_categories(url):
     tag_div_container = soup.find('div', class_='content-layout_inside', attrs={"id": "content-layout_inside-anchor"})
     if not tag_div_container:
         debug_printline("WARNING: parse_sub_categories | tag_div_container is None")
-        debug_exit(url, "WARNING: parse_sub_categories | tag_div_container is None")
+        debug_log_warning_msg(url, "WARNING: parse_sub_categories | tag_div_container is None")
     else:
         tag_div = tag_div_container.find('div', 'inside-layout')
         if not tag_div:
             debug_printline("WARNING: parse_sub_categories | tag_div is None")
-            debug_exit(url, "WARNING: parse_sub_categories | tag_div is None")
+            debug_log_warning_msg(url, "WARNING: parse_sub_categories | tag_div is None")
         else:
             """
             tag_section = tag_div.find('section', 'layout_article_sidebar__left')
             if not tag_section:
-                debug_exit(url, "sub - section")
+                debug_log_warning_msg(url, "sub - section")
             tag_aside = tag_section.find('aside')
             if not tag_aside:
-                debug_exit(url, "sub - aside")
+                debug_log_warning_msg(url, "sub - aside")
             tag_nav = tag_aside.find('nav', 'sidebar-dropdown-nav-wrapper')
             if not tag_nav:
-                debug_exit(url, "sub - nav")
+                debug_log_warning_msg(url, "sub - nav")
             tag_ul = tag_nav.find('ul', 'not-list')
             """
             tag_ul = tag_div.find('ul', 'not-list')
@@ -402,49 +429,56 @@ def parse_sub_categories(url):
     tag_ul = soup.find('ul', 'not-list')
     if not tag_ul:
         debug_printline("WARNING: parse_sub_categories | tag_ul is None")
-        debug_exit(url, "WARNING: parse_sub_categories | tag_ul is None")
+        debug_log_warning_msg(url, "WARNING: parse_sub_categories | tag_ul is None")
     else:
         tag_li = tag_ul.find('li', 'current')
         if not tag_li:
             debug_printline("WARNING: parse_sub_categories | tags_li is None")
-            debug_exit(url, "WARNING: parse_sub_categories | tags_li is None")
+            debug_log_warning_msg(url, "WARNING: parse_sub_categories | tags_li is None")
         else:
             tag_li_ul = tag_li.find('ul')
             if not tag_li_ul:
                 debug_printline("WARNING: parse_sub_categories | tag_li_ul is None")
-                debug_exit(url, "WARNING: parse_sub_categories | tag_li_ul is None")
+                debug_log_warning_msg(url, "WARNING: parse_sub_categories | tag_li_ul is None")
             else:
                 tags_li_ul_li = tag_li_ul.find_all('li')
                 if not tags_li_ul_li:
                     debug_printline("WARNING: parse_sub_categories | tags_li_ul_li is None")
-                    debug_exit(url, "WARNING: parse_sub_categories | tags_li_ul_li is None")
+                    debug_log_warning_msg(url, "WARNING: parse_sub_categories | tags_li_ul_li is None")
                 else:
                     for tag_li_ul_li in tags_li_ul_li:
                         tag_a = tag_li_ul_li.find('a')
-                        tag_a_name = tag_a.get_text().strip().replace('/', ' ')
+                        tag_a_name = tag_a.get_text().strip().replace('/', '-')
                         tag_a_url = tag_a.get('href')
 
-                        # 这里需要检测该页面是否已经爬取过
-                        # 如果已经爬过，则跳过
+                        # debug print
+                        debug_printline("..." + tag_a_url + " | " + tag_a_name)
 
-                        # save_url_list()
-                        # if not existing_url(tag_a_url):
-                        if save_url_to_file(tag_a_name, tag_a_url):
-                            # debug print
-                            debug_printline("..." + tag_a_url + " | " + tag_a_name)
+                        # save to log file
+                        debug_log_url(tag_a_url, '')
 
-                            # save to log file
-                            debug_log(tag_a_url, tag_a_name)
+                        # 这里需要判断本页面是子分类页面还是产品列表页面
+                        # 判断依据是
+                        tag_div = soup.find('div', 'search-result__sub-heading-refresh')
+                        if not tag_div:
+                            # parse sub categories
+                            # 爬取子分类
+                            # 页面结构和算法和本方法相同
+                            # 这里需要检测该页面是否已经爬取过
+                            # 如果已经爬过，则跳过
+                            if not cat_is_existing(tag_a_url, tag_a_name):
+                                save_cat_url(tag_a_url, tag_a_name)
 
-                            # 这里需要判断本页面是子分类页面还是产品列表页面
-                            # 判断依据是
-                            tag_div = soup.find('div', 'search-result__sub-heading-refresh')
-                            if not tag_div:
-                                # parse sub categories
-                                # 爬取子分类
-                                # 页面结构和算法和本方法相同
+                                # 爬取子分类页面
                                 parse_sub_categories(BASE_URL + tag_a_url)
-                            else:
+                        else:
+                            # 这里需要检测该页面是否已经爬取过
+                            # 如果已经爬过，则跳过
+                            if not cat_is_existing(tag_a_url, tag_a_name):
+                                # save category url & name
+                                save_cat_url(tag_a_url, tag_a_name)
+
+                                # 爬起产品列表页面
                                 parse_product_list(BASE_URL + tag_a_url)
     return
 
@@ -471,19 +505,19 @@ def parse_product_list(url):
     if not tag_div_container:
         debug_printline("WARNING: ", url)
         debug_printline("WARNING: parse_product_list | tag_div_container is None")
-        debug_exit(url, "WARNING: parse_product_list | tag_div_container is None")
+        debug_log_warning_msg(url, "WARNING: parse_product_list | tag_div_container is None")
     else:
         # this is the product list page
         # find products total counts first, default count/page is 48
         tag_div = soup.find('div', 'search-result__sub-heading-refresh')
         if not tag_div:
             debug_printline("WARNING: parse_product_list | tag_legend is None")
-            debug_exit(url, "WARNING: parse_product_list | tag_legend is None")
+            debug_log_warning_msg(url, "WARNING: parse_product_list | tag_legend is None")
         else:
             tag_div_h2 = tag_div.find('h2', 'search-result__sub-heading')
             if not tag_div_h2:
                 debug_printline("WARNING: parse_product_list | tag_label_span is None")
-                debug_exit(url, "WARNING: parse_product_list | tag_label_span is None")
+                debug_log_warning_msg(url, "WARNING: parse_product_list | tag_label_span is None")
             else:
                 tag_div_h2_str = tag_div_h2.get_text().strip()
 
@@ -610,7 +644,7 @@ def parse_product_list(url):
                                         # debug_print(" | $", product_price)
                                         # debug_print(" | ", product_url)
 
-                                        save_product_to_file('', product_id, product_description, str(product_price), product_url, 'img_url/')
+                                        save_product_to_file(get_cat_from_url(url), product_id, product_description, str(product_price), product_url, 'img_url/')
 
                                         # 分析产品页面
                                         # parse_items(BASE_URL + product_url)
@@ -664,7 +698,7 @@ args_num = len(sys.argv)
 if args_num > 1:
     for i in range(1, args_num):
         start_time = time.asctime(time.localtime(time.time()))
-        debug_log(url, start_time)
+        debug_log_url(url, start_time)
 
         url = sys.argv[i]
         soup = load_remote_url(url)
@@ -689,7 +723,7 @@ if args_num > 1:
             debug_printline("argv[", str(i), "] ", "is not valid url")
 
         finish_time = time.asctime(time.localtime(time.time()))
-        debug_log(url, finish_time)
+        debug_log_url(url, finish_time)
 
 else:
     DEBUG_LEVEL = 0
@@ -697,4 +731,4 @@ else:
 
 finish_time = time.asctime(time.localtime(time.time()))
 debug_printline(finish_time)
-debug_log(url, finish_time)
+debug_log_url(url, finish_time)
