@@ -6,6 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
+from selenium.webdriver.firefox.options import Options
 import lxml
 import json
 import time
@@ -50,19 +51,21 @@ ua = [
     ]
 
 BASE_URL = "https://www.bunnings.com.au"
-START_URL = BASE_URL + "/our-range"
+CAT_URL = "/our-range"
+START_URL = BASE_URL + CAT_URL
 
 DEBUG_URL = "./tools.html"
 
 BASE_DIR = "./bunnings-warehouse/"
 CAT_FILE_EXT = ".cat"
+CSV_FILE_EXT = ".csv"
 
 global WARNING_LOG_FILE
 WARNING_LOG_FILE = 'warning.log'
 global URL_LOG_FILE
 URL_LOG_FILE = 'url.log'
 
-global fox_driver
+global FOX_DRIVER
 global ItemsPerPage
 global console
 global DEBUG_LEVEL
@@ -89,7 +92,7 @@ def test_url_level(soup):
         return 5
     else:
         return 0
-    return
+    # return
 
 
 # debug print
@@ -145,10 +148,10 @@ def debug_log_url(url, msg):
 def debug_add_table_header(table):
     if DEBUG_MODE:
         table.add_column("ID", style="dim", width=4, justify="right")
-        table.add_column("S/N", width=9, justify="left")
+        table.add_column("S/N", width=7, justify="left")
         table.add_column("ITEM", width=96, justify="left")
         table.add_column("PRICE", width=12, justify="right")
-        table.add_column("URL", width=64, justify="left")
+        table.add_column("URL", width=96, justify="left")
     return
 
 
@@ -196,10 +199,10 @@ def load_remote_url(url):
 
 def browser_load_remote_url(url):
     global FOX_DRIVER
-    firefox = FirefoxBinary("/usr/bin/firefox")
-    options = webdriver.FirefoxOptions()
-    options.add_argument('--headless')
-    FOX_DRIVER = webdriver.Firefox(firefox_options=options)
+    # firefox = FirefoxBinary("/usr/bin/firefox")
+    options = Options()
+    options.headless = True
+    FOX_DRIVER = webdriver.Firefox(options=options)
     # 设置隐性等待时间，最长等待 30 秒
     FOX_DRIVER.implicitly_wait(30)
     FOX_DRIVER.get(url)
@@ -235,7 +238,7 @@ def save_product_to_file(p_category, p_id, p_description, p_price, p_url, p_img_
     # :return:
 
     csv_dir = BASE_DIR + p_category
-    csv_file_name = csv_dir + '/' + p_id + '.csv'
+    csv_file_name = csv_dir + '/' + p_id + CSV_FILE_EXT
 
     if not os.path.exists(csv_dir):
         # debug_log_warning_msg(p_category, "WARNING: " + p_category + " is not existing")
@@ -257,13 +260,17 @@ def save_product_to_file(p_category, p_id, p_description, p_price, p_url, p_img_
 
 # strip category from url
 # 从 url 中提取产品类别
-# url 是完整的 网页链接
+# url 如果是完整的 网页链接，则返回 https://www.bunnings.com.au 之后的部分
+#     如果是 /our-range/... 格式，则返回整个 url
+#     否则返回 False
 
 def get_cat_from_url(url):
     if url.startswith(BASE_URL):
         return url[len(BASE_URL):]
-    else:
+    elif url.startswith(CAT_URL):
         return url
+    else:
+        return False
 
 
 # save category url details to file
@@ -291,8 +298,8 @@ def cat_is_existing(p_url, p_name):
     #           True    if existing
     #           False   if not existing
 
-    dest_dir = BASE_DIR + p_url + p_name + '/'
-    dest_file_name = dest_dir + p_name + CAT_FILE_EXT
+    dest_dir = BASE_DIR + p_url
+    dest_file_name = dest_dir + '/' + p_name + CAT_FILE_EXT
 
     if os.path.exists(dest_dir):
         if os.path.exists(dest_file_name):
@@ -381,7 +388,7 @@ def parse_main_categories(url):
             # parse sub categories
             parse_sub_categories(BASE_URL + cat_url)
     else:
-        debug_printline(url)
+        # debug_printline(url)
         debug_log_warning_msg(url, "WARNING: parse_main_categories | categories is None")
     return
 
@@ -467,7 +474,7 @@ def parse_sub_categories(url):
                             # 这里需要检测该页面是否已经爬取过
                             # 如果已经爬过，则跳过
                             if not cat_is_existing(tag_a_url, tag_a_name):
-                                save_cat_url(tag_a_url, tag_a_name)
+                                # save_cat_url(tag_a_url, tag_a_name)
 
                                 # 爬取子分类页面
                                 parse_sub_categories(BASE_URL + tag_a_url)
@@ -533,7 +540,8 @@ def parse_product_list(url):
                     page_num += 1
                     page_num_str = str(page_num)
                     page_link = url + '?page=' + page_num_str
-                    debug_printline("page# ", page_num_str)
+                    # debug_printline("page# ", page_num_str)
+                    debug_printline("page# ", page_num_str + " /" + str(page_count))
                     debug_printline(page_link)
 
                     # load dynamic url using selenium
@@ -634,17 +642,17 @@ def parse_product_list(url):
                                             # 产品价格
                                             product_price = tag_price_dollars + tag_price_cents
 
-                                        # 产品图片链接
-
-
                                         # 打印产品信息
-                                        debug_add_item(table, str(current_product_index_on_this_page), product_id, product_description, "$" + str(product_price), product_url)
+                                        # debug_add_item(table, str(current_product_index_on_this_page), product_id, product_description, "$" + str(product_price), product_url)
+                                        debug_add_item(table, f'{current_product_index_on_this_page: 4d}', product_id, product_description, f'${product_price: ,.2f}', product_url)
                                         # debug_print(product_id)
                                         # debug_print(" | ", product_description)
                                         # debug_print(" | $", product_price)
                                         # debug_print(" | ", product_url)
 
-                                        save_product_to_file(get_cat_from_url(url), product_id, product_description, str(product_price), product_url, 'img_url/')
+                                        cat_url = get_cat_from_url(url)
+                                        if cat_url:
+                                            save_product_to_file(cat_url, product_id, product_description, str(product_price), product_url, 'img_url/')
 
                                         # 分析产品页面
                                         # parse_items(BASE_URL + product_url)
@@ -701,6 +709,18 @@ if args_num > 1:
         debug_log_url(url, start_time)
 
         url = sys.argv[i]
+        if not url.startswith((BASE_URL)):
+            if not url.startswith(CAT_URL):
+                debug_printline(f'WARNING: {url} is not valid url')
+                # exit program
+                finish_time = time.asctime(time.localtime(time.time()))
+                debug_log_url(url, finish_time)
+                sys.exit("Not valid url")
+            else:
+                # /our-range/...
+                # amend url to full https://bunnings.com.au/our-range/...
+                url = BASE_URL + url
+
         soup = load_remote_url(url)
         url_level = test_url_level(soup)
 
