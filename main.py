@@ -81,14 +81,20 @@ ItemsPerPage = 48
 
 def test_url_level(soup):
     if soup.find('div', "chalkboard-module-dropdown"):
+        # our-range
         return 1
     elif soup.find('div', attrs={"class": "inside-layout", "datav3-module-name": "RangeCategories"}):
+        # main category
         return 2
     elif soup.find('ul', attrs={"class": "not-list"}):
-        return 3
-    elif soup.find('div', attrs={"class": "search-result__sub-heading-refresh"}):
-        return 4
+        if not soup.find('div', attrs={"class": "search-result__sub-heading-refresh"}):
+            # sub category
+            return 3
+        else:
+            # product list
+            return 4
     elif soup.find('div', attrs={"class": "product-detail__container"}):
+        # item detail
         return 5
     else:
         return 0
@@ -276,7 +282,7 @@ def get_cat_from_url(url):
 # save category url details to file
 # 保存商品分类的 URL 信息
 
-def save_cat_url(cat_url, cat_name):
+def save_cat_url(cat_url, cat_name, productlist_count):
     dest_dir = BASE_DIR + cat_url + '/'
     dest_file = dest_dir + cat_name + CAT_FILE_EXT
 
@@ -285,6 +291,8 @@ def save_cat_url(cat_url, cat_name):
     if not os.path.exists(dest_file):
         with open(dest_file, 'w') as cat:
             cat.writelines(cat_url + '\n')
+            cat.writelines("products = " + str(productlist_count))
+            debug_printline("saving | products = " + str(productlist_count))
     return
 
 
@@ -303,7 +311,13 @@ def cat_is_existing(p_url, p_name):
 
     if os.path.exists(dest_dir):
         if os.path.exists(dest_file_name):
-            return True
+            with open(dest_file_name, 'r') as cat:
+                for line in cat:
+                    if line.startswith("products = "):
+                        productlist_count = int(line.split(' ')[2])
+                        if productlist_count > 0:
+                            debug_printline("existing | products = " + str(productlist_count))
+                            return True
     return False
 
 
@@ -408,31 +422,7 @@ def parse_sub_categories(url):
     debug_printline(url)
 
     soup = load_remote_url(url)
-    '''
-    tag_div_container = soup.find('div', class_='content-layout_inside', attrs={"id": "content-layout_inside-anchor"})
-    if not tag_div_container:
-        debug_printline("WARNING: parse_sub_categories | tag_div_container is None")
-        debug_log_warning_msg(url, "WARNING: parse_sub_categories | tag_div_container is None")
-    else:
-        tag_div = tag_div_container.find('div', 'inside-layout')
-        if not tag_div:
-            debug_printline("WARNING: parse_sub_categories | tag_div is None")
-            debug_log_warning_msg(url, "WARNING: parse_sub_categories | tag_div is None")
-        else:
-            """
-            tag_section = tag_div.find('section', 'layout_article_sidebar__left')
-            if not tag_section:
-                debug_log_warning_msg(url, "sub - section")
-            tag_aside = tag_section.find('aside')
-            if not tag_aside:
-                debug_log_warning_msg(url, "sub - aside")
-            tag_nav = tag_aside.find('nav', 'sidebar-dropdown-nav-wrapper')
-            if not tag_nav:
-                debug_log_warning_msg(url, "sub - nav")
-            tag_ul = tag_nav.find('ul', 'not-list')
-            """
-            tag_ul = tag_div.find('ul', 'not-list')
-    '''
+
     tag_ul = soup.find('ul', 'not-list')
     if not tag_ul:
         debug_printline("WARNING: parse_sub_categories | tag_ul is None")
@@ -466,31 +456,32 @@ def parse_sub_categories(url):
 
                         # 这里需要判断本页面是子分类页面还是产品列表页面
                         # 判断依据是
-                        tag_div = soup.find('div', 'search-result__sub-heading-refresh')
-                        if not tag_div:
+                        # tag_div = soup.find('div', 'search-result__sub-heading-refresh')
+                        page_level = test_url_level(soup)
+                        if page_level == 3:
                             # parse sub categories
                             # 爬取子分类
                             # 页面结构和算法和本方法相同
                             # 这里需要检测该页面是否已经爬取过
                             # 如果已经爬过，则跳过
                             if not cat_is_existing(tag_a_url, tag_a_name):
-                                # save_cat_url(tag_a_url, tag_a_name)
-
                                 # 爬取子分类页面
                                 parse_sub_categories(BASE_URL + tag_a_url)
-                        else:
+                        elif page_level == 4:
                             # 这里需要检测该页面是否已经爬取过
                             # 如果已经爬过，则跳过
                             if not cat_is_existing(tag_a_url, tag_a_name):
-                                # save category url & name
-                                save_cat_url(tag_a_url, tag_a_name)
-
                                 # 爬起产品列表页面
-                                parse_product_list(BASE_URL + tag_a_url)
+                                productlist_count = parse_product_list(BASE_URL + tag_a_url)
+                                # save category url & name
+                                save_cat_url(tag_a_url, tag_a_name, productlist_count)
+                        else:
+                            debug_printline("WARNING: *******************************************")
+                            debug_log_warning_msg(url, "Not in sub category or product list page")
     return
 
 
-# parse sub categories
+# parse product list page
 # 爬取产品列表页面
 
 def parse_product_list(url):
@@ -506,6 +497,8 @@ def parse_product_list(url):
     debug_printline(url)
 
     soup = load_remote_url(url)
+
+    productlist_count = 0
 
     tag_div_container = soup.find('div', attrs={"class": ["product-list-group", "paged-items"]})
 
@@ -665,7 +658,7 @@ def parse_product_list(url):
 
                     # close selenium browser window
                     browser_close()
-    return
+    return productlist_count
 
 
 # parse items
@@ -682,6 +675,14 @@ def parse_items(url):
     # debug print
     debug_printline("==== ==== <item-page> ==== ====")
     debug_printline(url)
+
+    soup = load_remote_url(url)
+
+    page_level = test_url_level(soup)
+    if not page_level == 5:
+        debug_printline(url, "is not valid item page")
+        debug_log_warning_msg(url, "not valid item page")
+        return
 
     return
 
@@ -732,10 +733,10 @@ if args_num > 1:
             parse_main_categories(url)
         elif url_level == 3:
             debug_printline(">> [ sub category ]")
-            parse_main_categories(url)
+            parse_sub_categories(url)
         elif url_level == 4:
             debug_printline(">> [ product list ]")
-            parse_sub_categories(url)
+            parse_product_list(url)
         elif url_level == 5:
             debug_printline(">> [ item details ]")
             parse_items(url)
