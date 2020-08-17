@@ -1,6 +1,8 @@
 # bunnings-spyder
 crawl bunnings products
 
+python3/BeautifulSoup/selenium/lxml/json//time/math/sys/random//os/csv/rich
+
 https://www.bunnings.com.au/
 
 /our-range
