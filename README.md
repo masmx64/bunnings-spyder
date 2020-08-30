@@ -20,4 +20,5 @@ https://www.bunnings.com.au/item-url
 
 starting from https://www.bunnings.com.au/our-range, walk through each category & save products info to txt file, would add database functions later
 
-currently having some issues like will search some sub categories that have already been walked through, & may miss some products
+---------------------------------------------------------
+2020.08.31  - rewrite in oop
