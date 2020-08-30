@@ -1,8 +1,10 @@
 # bunnings-spyder
-crawl bunnings products
+search & save bunnings products info locally
+--------------------------------------------------------
 
 python3/BeautifulSoup/selenium/lxml/json//time/math/sys/random//os/csv/rich
 
+--------------------------------------------------------
 https://www.bunnings.com.au/
 
 /our-range
@@ -17,6 +19,7 @@ https://www.bunnings.com.au/
 
 https://www.bunnings.com.au/item-url
 
+--------------------------------------------------------
 
 starting from https://www.bunnings.com.au/our-range, walk through each category & save products info to txt file, would add database functions later
 
